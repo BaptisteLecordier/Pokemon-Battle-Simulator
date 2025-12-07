@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simulateur de combat Pokémon</title>
+  <style>
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #050816;
+    color: #e5e7eb;
+    padding: 20px;
+    margin: 0;
+  }
+
+  h1 {
+    text-align: center;
+    margin-top: 0;
+    color: #e5e7eb;
+  }
+
+  .card {
+    max-width: 900px;
+    margin: 0 auto 20px;
+    background: #0b1120;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+    border: 1px solid #111827;
+  }
+
+  .screen { display: none; }
+  .screen.visible { display: block; }
+
+  /* --- Sélection d'équipe --- */
+
+  .search-bar {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 999px;
+    border: 1px solid #4b5563;
+    font-size: 0.9rem;
+    background: #020617;
+    color: #e5e7eb;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  }
+
+  .search-bar:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 1px #60a5fa;
+    transform: translateY(-1px);
+  }
+
+  .pokemon-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 260px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+    padding-right: 4px;
+  }
+
+  .pokemon-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: #020617;
+    border: 1px solid #1f2937;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+
+  .pokemon-entry-sprite {
+    width: 64px;           /* largeur fixe pour tous les sprites de la liste */
+    height: 56px;
+    flex: 0 0 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    }
+
+  .pokemon-entry:hover {
+    background: #0f172a;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+  }
+
+  .pokemon-entry.selected {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  /* sprite dans la liste : ne déborde pas, garde son ratio, taille confort */
+  .pokemon-entry img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    image-rendering: pixelated;
+    display: block;
+    }
+
+
+  .pokemon-entry-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .pokemon-entry-buttons {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+  }
+
+  .btn {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: #111827;
+    color: #e5e7eb;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease, border-color 0.1s ease;
+  }
+
+  .btn-primary {
+    background: #1f2937;
+    border-color: #374151;
+  }
+
+  .btn-secondary {
+    background: #020617;
+    border-color: #374151;
+  }
+
+  .btn-small { padding: 4px 8px; font-size: 0.75rem; }
+
+  .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    filter: brightness(1.05);
+    border-color: #60a5fa;
+  }
+
+  .btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 6px;
+    min-height: 90px;
+  }
+
+  .team-slot {
+    position: relative;
+    background: #020617;
+    border-radius: 12px;
+    border: 1px dashed #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80px;
+  }
+
+  /* sprite dans l'équipe sélectionnée : rempli le slot sans se déformer */
+  .team-slot img {
+    width: 100%;
+    height: 100%;
+    max-width: 64px;
+    max-height: 64px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .team-slot span.placeholder {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .team-slot-remove {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 0.8rem;
+    color: #f97316;
+    cursor: pointer;
+    transition: transform 0.1s, color 0.1s;
+  }
+
+  .team-slot-remove:hover {
+    color: #fbbf24;
+    transform: scale(1.1);
+  }
+
+  .big-btn {
+    width: 100%;
+    padding: 10px 14px;
+    margin-top: 12px;
+    border-radius: 999px;
+    border: 1px solid #16a34a;
+    background: #065f46;
+    color: #e5e7eb;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.1s, border-color 0.1s;
+  }
+
+  .big-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    filter: brightness(1.03);
+    border-color: #22c55e;
+  }
+
+  .big-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* Popup générique */
+
+  .popup.hidden { display: none; }
+
+  .popup {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .popup-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15,23,42,0.85);
+    backdrop-filter: blur(3px);
+  }
+
+  .popup-content {
+    position: relative;
+    z-index: 51;
+    background: #020617;
+    padding: 20px;
+    border-radius: 14px;
+    border: 1px solid #1f2937;
+    max-width: 360px;
+    width: 90%;
+    color: #e5e7eb;
+    text-align: center;
+    box-shadow: 0 18px 45px rgba(0,0,0,0.6);
+  }
+
+  .popup-content h2 { margin-top: 0; margin-bottom: 8px; }
+
+  .popup-close {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: transform 0.1s, color 0.1s;
+  }
+
+  .popup-close:hover {
+    transform: scale(1.1);
+    color: #e5e7eb;
+  }
+
+  /* Popup infos Pokémon */
+
+  #pokemon-info-sprite {
+    width: auto;
+    height: auto;
+    max-width: 96px;
+    max-height: 96px;
+    image-rendering: pixelated;
+    margin-bottom: 6px;
+  }
+
+  #pokemon-info-body {
+    text-align: left;
+    font-size: 0.9rem;
+  }
+
+  #pokemon-info-body h4 {
+    margin: 6px 0 4px;
+    font-size: 0.9rem;
+    color: #f9fafb;
+  }
+
+  #pokemon-info-body ul {
+    margin: 0;
+    padding-left: 16px;
+  }
+
+  #pokemon-info-body li { margin: 2px 0; }
+
+  /* Popup lead */
+
+  .lead-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  .lead-choice {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background: #020617;
+    border: 1px solid #1f2937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+  }
+
+  /* sprite dans le popup de lead */
+  .lead-choice img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .lead-choice:hover {
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(15,23,42,0.8);
+  }
+
+  /* Popup switch (changement de Pokémon) */
+
+  #switch-popup .popup-content {
+    max-width: 480px;
+  }
+
+  #switch-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .switch-card {
+    background: #020617;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.75rem;
+    transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+  }
+
+  .difficulty-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 4px;
+  font-size: 0.85rem;
+  color: #e5e7eb;
+}
+
+.difficulty-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.difficulty-buttons .btn-small {
+  padding-inline: 10px;
+}
+
+.difficulty-buttons .active {
+  border-color: #3b82f6;
+  background: #111827;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+
+  .switch-card:hover {
+    border-color: #3b82f6;
+    background: #020617;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(15,23,42,0.8);
+  }
+
+  /* sprite dans les cartes de switch */
+  .switch-card img {
+    width: 100%;
+    height: 56px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .switch-hp-bar {
+    width: 100%;
+    height: 6px;
+    background: #111827;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .switch-hp-fill {
+    height: 100%;
+    width: 100%;
+    background: #22c55e;
+  }
+
+  .switch-hp-text {
+    font-size: 0.7rem;
+    margin-top: 2px;
+  }
+
+  /* --- Écran combat --- */
+
+  .battle-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* barres de statut : JOUEUR à gauche, IA à droite */
+  .battle-status-row {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    flex-wrap: nowrap;  /* reste côte à côte même sur mobile */
+  }
+
+  .status-box {
+    flex: 1 1 0;
+    min-width: 0;
+    background: #020617;
+    border-radius: 12px;
+    border: 1px solid #1f2937;
+    padding: 8px;
+  }
+
+  .pokemon-name {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .hp-bar {
+    width: 100%;
+    height: 16px;
+    background: #111827;
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 4px 0 4px;
+    border: 1px solid #020617;
+  }
+
+  .hp-fill {
+    height: 100%;
+    width: 100%;
+    background: #22c55e;
+    transition: width 0.25s ease-out, background 0.25s ease-out;
+  }
+
+  .hp-text {
+    font-size: 0.8rem;
+    color: #e5e7eb;
+  }
+
+  .remaining {
+    font-size: 0.8rem;
+    color: #9ca3af;
+  }
+
+  .team-icons {
+    display: flex;
+    justify-content: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .team-icons .slot {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid #4b5563;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .team-icons .slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .team-icons .slot.dead {
+    opacity: 0.4;
+    filter: grayscale(1);
+  }
+
+  /* TERRAIN : les deux Pokémon dans la même zone */
+
+  .battle-field {
+    position: relative;
+    height: 220px;
+    margin-top: 4px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #1f2937;
+    background-image: url("./bg.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #020617;
+  }
+
+  .field-side {
+    position: absolute;
+    width: 50%;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  /* Joueur à gauche, un peu plus bas */
+  .field-player {
+    left: 0;
+    bottom: 16px;
+  }
+
+  /* IA à droite, un peu plus haut */
+  .field-ai {
+    right: 0;
+    bottom: 40px;
+  }
+
+  /* En combat : on garde la taille d’origine des sprites,
+     juste pixel perfect, pas de width/height imposés */
+  .field-side img {
+    image-rendering: pixelated;
+    display: block;
+  }
+
+  /* IA légèrement réduite (second plan), mais on garde les proportions relatives */
+  #ai-sprite {
+    transform: scale(0.9);
+    transform-origin: center bottom;
+  }
+
+  /* Animations */
+
+  @keyframes entry-fall {
+    0%   { transform: translateY(-40px); opacity:0; }
+    100% { transform: translateY(0); opacity:1; }
+  }
+
+  @keyframes attack-player {
+    0%   { transform: translateX(0); }
+    40%  { transform: translateX(40px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes attack-ai {
+    0%   { transform: translateX(0); }
+    40%  { transform: translateX(-40px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes faint {
+    0%   { transform: translateY(0) scale(1); opacity:1; }
+    60%  { transform: translateY(40px) scale(0.9); opacity:0.6; }
+    100% { transform: translateY(80px) scale(0.7); opacity:0; }
+  }
+
+  .entry-animation  { animation: entry-fall 0.4s ease-out; }
+  .attack-player    { animation: attack-player 0.3s ease-out; }
+  .attack-ai        { animation: attack-ai 0.3s ease-out; }
+  .faint-animation  { animation: faint 0.45s ease-in forwards; }
+
+  /* Menu d'attaques */
+
+  .actions {
+    background: #020617;
+    border-radius: 12px;
+    border: 1px solid #1f2937;
+    padding: 10px;
+    margin-top: 4px;
+  }
+
+  .moves-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .move-btn {
+    border-radius: 10px;
+    border: 1px solid #374151;
+    background: #0f172a;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.1s, border-color 0.1s;
+  }
+
+  .move-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    border-color: #60a5fa;
+  }
+
+  .move-type-badge {
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+  }
+
+  .menu-row {
+    display: flex;
+    justify-content: center; /* bouton centré */
+    gap: 8px;
+  }
+
+  .log {
+    margin-top: 10px;
+    background: #020617;
+    border-radius: 10px;
+    border: 1px solid #1f2937;
+    padding: 8px;
+    height: 180px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+  }
+
+  .log p { margin: 2px 0; }
+
+  /* Popup fin */
+
+  #end-popup .popup-content p {
+    margin: 10px 0 14px;
+  }
+
+  /* Couleurs types */
+
+  .type-normal  { background: #A8A77A; }
+  .type-fire    { background: #EE8130; color:#fff; }
+  .type-water   { background: #6390F0; color:#fff; }
+  .type-electric{ background: #F7D02C; color:#111; }
+  .type-grass   { background: #7AC74C; color:#111; }
+  .type-ice     { background: #96D9D6; color:#111; }
+  .type-fighting{ background: #C22E28; color:#fff; }
+  .type-poison  { background: #A33EA1; color:#fff; }
+  .type-ground  { background: #E2BF65; color:#111; }
+  .type-flying  { background: #A98FF3; color:#111; }
+  .type-psychic { background: #F95587; color:#fff; }
+  .type-bug     { background: #A6B91A; color:#111; }
+  .type-rock    { background: #B6A136; color:#111; }
+  .type-ghost   { background: #735797; color:#fff; }
+  .type-dragon  { background: #6F35FC; color:#fff; }
+  .type-dark    { background: #705746; color:#fff; }
+  .type-steel   { background: #B7B7CE; color:#111; }
+  .type-fairy   { background: #D685AD; color:#111; }
+
+  @media (max-width: 700px) {
+    .battle-status-row {
+      gap: 6px;
+    }
+  }
+</style>
+
+
+
+  </style>
+</head>
+<body>
+
+<h1>Simulateur de combat Pokémon</h1>
+
+<!-- Écran sélection -->
+<div id="team-select-screen" class="card screen visible">
+  <h2>Choisis ton équipe (6 Pokémon)</h2>
+
+  <input id="search-input" class="search-bar" type="text" placeholder="Rechercher un Pokémon...">
+
+  <div id="pokemon-list" class="pokemon-list"></div>
+
+  <h3>Équipe sélectionnée (<span id="selected-count">0</span>/6)</h3>
+  <div id="selected-team" class="team-grid"></div>
+
+  <div class="difficulty-selector">
+    <span>Mode de difficulté :</span>
+    <div class="difficulty-buttons">
+      <button id="difficulty-easy" class="btn btn-secondary btn-small">Facile</button>
+      <button id="difficulty-medium" class="btn btn-secondary btn-small active">Moyen</button>
+      <button id="difficulty-hard" class="btn btn-secondary btn-small">Difficile</button>
+    </div>
+  </div>
+
+  <button id="validate-team-btn" class="big-btn" disabled>Valider l'équipe</button>
+</div>
+
+<!-- Popup infos Pokémon -->
+<div id="pokemon-info-popup" class="popup hidden">
+  <div class="popup-backdrop"></div>
+  <div class="popup-content">
+    <button id="info-close-btn" class="popup-close">✕</button>
+    <h2 id="pokemon-info-name"></h2>
+    <img id="pokemon-info-sprite" alt="">
+    <div id="pokemon-info-body">
+      <h4>Types</h4>
+      <p id="pokemon-info-types"></p>
+      <h4>Statistiques</h4>
+      <ul id="pokemon-info-stats"></ul>
+      <h4>Attaques</h4>
+      <ul id="pokemon-info-moves"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- Popup choix lead -->
+<div id="lead-popup" class="popup hidden">
+  <div class="popup-backdrop"></div>
+  <div class="popup-content">
+    <h2>Choisis ton Pokémon de départ</h2>
+    <div id="lead-options" class="lead-grid"></div>
+    <button id="cancel-lead" class="btn btn-secondary" style="margin-top:8px;">Annuler</button>
+  </div>
+</div>
+
+<!-- Popup changement de Pokémon -->
+<div id="switch-popup" class="popup hidden">
+  <div class="popup-backdrop"></div>
+  <div class="popup-content">
+    <button id="switch-close-btn" class="popup-close">✕</button>
+    <h2>Choisissez un Pokémon</h2>
+    <div id="switch-options"></div>
+  </div>
+</div>
+
+<!-- Écran combat -->
+<div id="battle-screen" class="card screen">
+  <div class="battle-layout">
+    <!-- Statuts : JOUEUR à gauche, IA à droite -->
+    <div class="battle-status-row">
+      <!-- Joueur -->
+      <div class="status-box">
+        <div id="player-name" class="pokemon-name"></div>
+        <div class="hp-bar"><div id="player-hp-fill" class="hp-fill"></div></div>
+        <div id="player-hp-text" class="hp-text"></div>
+        <div id="player-remaining" class="remaining"></div>
+        <div id="player-team-icons" class="team-icons"></div>
+      </div>
+
+      <!-- IA -->
+      <div class="status-box">
+        <div id="ai-name" class="pokemon-name"></div>
+        <div class="hp-bar"><div id="ai-hp-fill" class="hp-fill"></div></div>
+        <div id="ai-hp-text" class="hp-text"></div>
+        <div id="ai-remaining" class="remaining"></div>
+      </div>
+    </div>
+
+    <!-- Terrain partagé -->
+    <div class="battle-field">
+      <div class="field-side field-player">
+        <img id="player-sprite" alt="">
+      </div>
+      <div class="field-side field-ai">
+        <img id="ai-sprite" alt="">
+      </div>
+    </div>
+
+    <!-- Actions & log -->
+    <div class="actions">
+      <div id="moves-container" class="moves-grid"></div>
+      <div class="menu-row">
+        <button id="switch-button" class="btn btn-secondary">Changer de Pokémon</button>
+      </div>
+    </div>
+
+    <div id="log" class="log"></div>
+  </div>
+</div>
+
+<!-- Popup fin de combat -->
+<div id="end-popup" class="popup hidden">
+  <div class="popup-backdrop"></div>
+  <div class="popup-content">
+    <h2 id="popup-title"></h2>
+    <p id="popup-message"></p>
+    <button id="popup-restart" class="big-btn">Rejouer</button>
+  </div>
+</div>
+
+<!-- JS -->
+<script src="types.js"></script>
+<script src="statuses.js"></script>
+<script src="moves.js"></script>
+<script src="pokemon.js"></script>
+<script src="battle.js"></script>
+
+
+</body>
+</html>
